@@ -1,0 +1,2 @@
+class FreedCellError(Exception):
+    pass
