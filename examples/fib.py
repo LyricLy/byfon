@@ -1,4 +1,5 @@
 import byfon
+from byfon import while_
 
 
 tp = byfon.Transpiler()
@@ -8,8 +9,8 @@ y = tp.alloc()
 y += 1
 tmp = tp.alloc()
 
-with tp.while_(y):
-    y.output()
+with while_(y):
+    y.write()
     tmp <- ~y
     y += x
     x <- tmp

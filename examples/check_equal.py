@@ -4,12 +4,11 @@ import byfon
 tp = byfon.Transpiler()
 
 
-x = tp.alloc().input()
-y = tp.alloc().input()
+x = tp.alloc().read()
+y = tp.alloc().read()
 
 res = x == y
 res += ord("0")
-res.output()
-
+res.write()
 
 print(tp.result)

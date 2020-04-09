@@ -7,3 +7,5 @@ from .cell import Cell
 from .errors import FreedCellError
 from .nou import *
 from .switch import Switch
+from .logical import And
+from .control import if_, while_

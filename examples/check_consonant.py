@@ -4,7 +4,7 @@ import byfon
 tp = byfon.Transpiler()
 
 
-x = tp.alloc().input()
+x = tp.alloc().read()
 writer = tp.alloc()
 
 s = byfon.Switch(x)
