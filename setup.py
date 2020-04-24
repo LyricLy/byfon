@@ -21,6 +21,11 @@ setuptools.setup(
     install_requires = [x for x in requirements if "git+" not in x],
     dependency_links = [x.split("git+")[1] for x in requirements if "git+" in x],
     license = "MIT",
+    entry_points = {
+        "console_scripts": [
+            "byfon = byfon:main"
+        ]
+    },
     classifiers = [
             "Development Status :: 3 - Alpha",
             "License :: OSI Approved :: MIT License",

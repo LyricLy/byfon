@@ -1,0 +1,1 @@
+import sys; exec("try:\n    import byfon\nexcept ImportError:\n    pass\nelse:\n    byfon.register()\n")

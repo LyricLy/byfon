@@ -1,17 +1,35 @@
-from .control import if_
-
-
 class Word:
     def __init__(self, cells):
-        self.cells = cells
+        if not cells:
+            raise ValueError("word cannot contain 0 cells")
+        self.cell = cells[0]
+        self.rest = Word(cells[1:]) if cells[1:] else None
+
+    def _clear(self):
+        self.cell |= 0
+        if self.rest:
+            self.rest.clear()
 
     def _succ(self):
-        self.cells[0] += 1
-        last = self.cells[0]
-        tp = self.cells[0].tp
-        loops = []
-        for c in self.cells[1:]:
-            last._tp.seek(last.ptr)
-            ptr = ~last.not_()
-            ptr._exe_on("[")
-            
+        self.cell += 1
+        if self.rest:
+            for if_ in (~self.cell).not_():
+                self.rest._succ()
+
+    def _pred(self):
+        if self.rest:
+            for if_ in (~self.cell).not_():
+                self.rest._pred()
+        self.cell -= 1
+
+    def _if(self):
+        if self.rest:
+            for if_ in self.cell | self.rest:
+                self.rest.clear()
+                yield
+        else:
+            for if_ in self.cell:
+                yield
+
+    def _while(self):
+        ...
