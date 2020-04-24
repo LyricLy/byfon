@@ -24,16 +24,17 @@ class Transpiler:
     def exe(self, code):
         self._code.append(code)
 
-    def alloc(self):
+    def alloc(self, *, init=0):
         while self._temps:
             old_cell = self._temps.pop(0)
             # it could have been un-freed, in which case we shouldn't use it
             if old_cell.freed:
-                old_cell <- 0
+                old_cell |= 0
                 return old_cell
         b = Cell(self, self._last_open)
         self._ptrs[self._last_open].append(b)
         self._last_open += 1
+        b += init
         return b
 
     def alloc_word(self, size=8):
