@@ -11,8 +11,8 @@ tmp = tp.alloc()
 
 with while_(y):
     y.write()
-    tmp <- ~y
+    tmp |= ~y
     y += x
-    x <- tmp
+    x |= tmp
 
 print(tp.result)

@@ -12,4 +12,4 @@ def while_expr(expr, *, do=None):
     cell = do or expr()
     with while_(cell):
         yield
-        cell <- expr()
+        cell |= expr()

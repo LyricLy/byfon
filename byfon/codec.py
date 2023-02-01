@@ -9,9 +9,9 @@ utf8 = encodings.search_function("utf8")
 repl_table = {
     "if!": "for _BYFON_DUMMY in",
     "while! (.*?):": r"with byfon.while_(\1):",
-    "whilex! (.*?):": r"with byfon.while_expr(\1):",
-    "or!": "|",
-    "and!": "&",
+    "whilex! (.*?):": r"with byfon.while_expr(lambda: \1):",
+    "or!": ")|(",
+    "and!": ")&(",
     "<-": "|=",
     r"\.not([^a-zA-Z_])": r".not_()\1"
 }
@@ -47,7 +47,7 @@ class StreamReader(utf8.streamreader):
         self._decoded = False
 
 def register():
-    codecs.register(lambda _: codecs.CodecInfo(
+    codecs.register(lambda n: None if n != "byfon" else codecs.CodecInfo(
         name = "byfon",
         encode = utf8.encode,
         decode = decode,

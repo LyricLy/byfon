@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from collections import defaultdict
 import sys
 
 from .errors import FreedCellError
@@ -18,46 +19,72 @@ def need_alloc(func):
 
 def resolve_diff(diff):
     """Find the shortest BF code to change a cell by `diff`, making use of overflow."""
-    diff %= 256
-    if diff < 128:
-        return "+" * diff
+    if diff < 0:
+        return "-" * -diff
     else:
-        return "-" * (256 - diff)
+        return "+" * diff
+    #diff %= 256
+    #if diff < 128:
+    #    return "+" * diff
+    #else:
+    #    return "-" * (256 - diff)
 
 def unpack(ts, default=None):
     for t in ts:
-        try:
+        # I'd like to duck type this check but it actually ends up iterating over cell objects, which isn't a pure operation (as it tries to do an if)
+        if isinstance(t, tuple):
             x, y = t
-        except TypeError:
+        else:
             x = t
             y = default
         yield x, y
 
 class Cell:
-    def __init__(self, tp, ptr, *, is_zero=True):
+    def __init__(self, tp, ptr, *, is_zero=True, temp=False):
         self.tp = tp
         self.ptr = ptr
         self.freed = False
-        self._mov_on_lt = False
+        self.temp = temp
         self._must_be_zero = is_zero
 
     @need_alloc
     def free(self):
-        # the ultimate space optimization
-        if self._must_be_zero:
-            self.tp._temps.append(self)
-        self.freed = True
+        if not self.temp:
+            # the ultimate space optimization
+            if self._must_be_zero:
+                self.tp._temps.append(self)
+            self.freed = True
 
     def _exe_on(self, code, reset_zero=True):
         self.tp.seek(self.ptr)
         self.tp.exe(code)
         if code and reset_zero:
             self._must_be_zero = False
+            try:
+                bt = self.tp._backtracks[-1][self]
+            except IndexError:
+                return
+            for idx, diff in bt:
+                if diff >= 0:
+                    mov = ">" * diff
+                    amo = "<" * diff
+                else:
+                    mov = "<" * -diff
+                    amo = ">" * -diff
+                self.tp._code.insert(idx, mov + "[-]" + amo)
+            self.tp._backtracks[-1][self].clear()
 
     def _ensure_zero(self):
-        if not self._must_be_zero:
+        if not self._must_be_zero or not self.tp.optimise_clears:
             self._exe_on("[-]")
             self._known_zero()
+        else:
+            # the "don't be lazy" ensurance - if we're in a loop in which this value gets changed later, things could break, so we store a reference back
+            # in case the value needs to be cleared later by `_exe_on`
+            try:
+                self.tp._backtracks[-1][self].append((len(self.tp._code), self.ptr - self.tp._ptr))
+            except IndexError:
+                pass
 
     def _known_zero(self):
         if not self._must_be_zero:
@@ -110,10 +137,12 @@ class Cell:
         if self._must_be_zero:
             print(f"WARNING: redundant if detected, cell at {self.ptr} is guaranteed to be 0", file=sys.stderr)
         with self.tp.loop():
-            yield
             self |= 0
-        self._known_zero()
-        self.free()
+            self.free()
+            yield
+            t = self.tp.alloc()
+            self.tp.seek(t.ptr)
+            t.free()
 
     @contextmanager
     @need_alloc
@@ -121,10 +150,12 @@ class Cell:
         self.tp.seek(self.ptr)
         if self._must_be_zero:
             print(f"WARNING: redundant while detected, cell at {self.ptr} is guaranteed to be 0", file=sys.stderr)
+        self.tp._backtracks.append(defaultdict(list))
         with self.tp.loop():
             yield
             if self._must_be_zero:
                 print(f"WARNING: while loop is equivalent to if, cell at {self.ptr} is guaranteed to be 0 after first loop", file=sys.stderr)
+        self.tp._backtracks.pop()
         self._known_zero()
 
     @need_alloc
@@ -145,6 +176,7 @@ class Cell:
     def and_(self, other):
         """Perform logical AND on two cells. Destructive (frees both cells)."""
         res = self.tp.alloc()
+        res._exe_on("[-]", False)
         for if_ in self:
             for if_ in other:
                 res += 1
@@ -172,10 +204,6 @@ class Cell:
 
     def __invert__(self):
         return self.copy()
-
-    def __neg__(self):
-        self._mov_on_lt = True
-        return self
 
     def __ior__(self, other):
         if isinstance(other, Cell):
@@ -246,8 +274,7 @@ class Cell:
     @need_alloc
     def __rsub__(self, other):
         """Subtract the cell from an integer. Destructive (frees)."""
-        res = self.tp.alloc()
-        res += other
+        res = self.tp.alloc(init=other)
         res -= self
         return res
 

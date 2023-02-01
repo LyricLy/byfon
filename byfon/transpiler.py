@@ -5,34 +5,38 @@ from .word import Word
 
 
 class Transpiler:
-    def __init__(self):
+    def __init__(self, *, optimise_clears=True, file=None):
         self._ptr = 0
         self._last_open = 0
         self._temps = []
         self._restores = []
         self._code = []
-        from collections import defaultdict
-        self._ptrs = defaultdict(list)
+        self._backtracks = []
+        self.optimise_clears = optimise_clears
+        self._file = file
 
     def seek(self, seek_ptr):
         if seek_ptr > self._ptr:
-            self._code.append(">" * (seek_ptr-self._ptr))
+            self.exe(">" * (seek_ptr-self._ptr))
         else:
-            self._code.append("<" * (self._ptr-seek_ptr))
+            self.exe("<" * (self._ptr-seek_ptr))
         self._ptr = seek_ptr
 
     def exe(self, code):
-        self._code.append(code)
+        if not self._file:
+            self._code.append(code)
+        else:
+            self._file.write(code)
 
-    def alloc(self, *, init=0):
-        while self._temps:
-            old_cell = self._temps.pop(0)
-            # it could have been un-freed, in which case we shouldn't use it
-            if old_cell.freed:
-                old_cell |= 0
-                return old_cell
-        b = Cell(self, self._last_open)
-        self._ptrs[self._last_open].append(b)
+    def alloc(self, *, init=0, consecutive=False, **kwargs):
+        if not consecutive:
+            while self._temps:
+                old_cell = self._temps.pop(0)
+                # it could have been un-freed, in which case we shouldn't use it
+                if old_cell.freed:
+                    old_cell |= init
+                    return old_cell
+        b = Cell(self, self._last_open, **kwargs)
         self._last_open += 1
         b += init
         return b
@@ -42,20 +46,24 @@ class Transpiler:
 
     @property
     def result(self):
-        code = "".join(self._code)
-        while True:
-            old_code = code
-            # simple optimizations
-            replacements = {
-                "+-": "",
-                "-+": "",
-                "><": "",
-                "<>": ""
-            }
-            for trigger, repl in replacements.items():
-                code = code.replace(trigger, repl)
-            if code == old_code:
-                return code
+        if not self._file:
+            code = "".join(self._code)
+            while True:
+                old_code = code
+                # simple optimizations
+                replacements = {
+                    "+-": "",
+                    "-+": "",
+                    "><": "",
+                    "<>": ""
+                }
+                for trigger, repl in replacements.items():
+                    code = code.replace(trigger, repl)
+                if code == old_code:
+                    return code
+        else:
+            self._file.close()
+            return "output in file"
 
     @contextmanager
     def loop(self):
